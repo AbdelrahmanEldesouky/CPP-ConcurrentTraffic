@@ -3,6 +3,7 @@
 
 #include <mutex>
 #include <deque>
+#include <memory>
 #include <condition_variable>
 #include "TrafficObject.h"
 
@@ -44,7 +45,6 @@ class TrafficLight : public TrafficObject
 public:
     // constructor / desctructor
     TrafficLight();
-    ~TrafficLight();
 
     // getters / setters
     TrafficLightPhase getCurrentPhase();

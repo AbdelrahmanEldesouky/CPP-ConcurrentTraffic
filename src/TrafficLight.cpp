@@ -14,10 +14,12 @@ T MessageQueue<T>::receive()
   // The received object should then be returned by the receive function.
 
   std::unique_lock<std::mutex> lock(_mutex);
+  _queue.clear();
+
   _condition.wait(lock, [this]
                   { return !_queue.empty(); });
-  T msg = std::move(_queue.front());
-  _queue.pop_front();
+  T msg = std::move(_queue.back());
+  _queue.pop_back();
   return msg;
 }
 
@@ -34,7 +36,10 @@ void MessageQueue<T>::send(T &&msg)
 
 /* Implementation of class "TrafficLight" */
 
-TrafficLight::TrafficLight() { _currentPhase = TrafficLightPhase::red; }
+TrafficLight::TrafficLight()
+{
+  _currentPhase = TrafficLightPhase::red;
+}
 
 void TrafficLight::waitForGreen()
 {
@@ -44,15 +49,19 @@ void TrafficLight::waitForGreen()
 
   while (true)
   {
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
     if (_trafficLightQueue.receive() == TrafficLightPhase::green)
     {
       return;
     }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
 }
 
-TrafficLightPhase TrafficLight::getCurrentPhase() { return _currentPhase; }
+TrafficLightPhase TrafficLight::getCurrentPhase() 
+{ 
+  std::lock_guard<std::mutex> lck(_mutex);
+  return _currentPhase; 
+}
 
 void TrafficLight::simulate()
 {
@@ -81,11 +90,11 @@ void TrafficLight::cycleThroughPhases()
   std::mt19937 gen(rd());
   std::uniform_int_distribution<int> dist(4000, 6000); // milliseconds
 
+  // Determine cycle duration
+  int cycleDuration = dist(gen);
+
   while (true)
   {
-    // Determine cycle duration
-    int cycleDuration = dist(gen);
-
     // Wait for 1ms
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
@@ -101,14 +110,7 @@ void TrafficLight::cycleThroughPhases()
     if (elapsedTime >= cycleDuration)
     {
       // Toggle traffic light phase
-      if (_currentPhase == TrafficLightPhase::red)
-      {
-        _currentPhase = TrafficLightPhase::green;
-      }
-      else
-      {
-        _currentPhase = TrafficLightPhase::red;
-      }
+      _currentPhase = _currentPhase == TrafficLightPhase::red ? TrafficLightPhase::green : TrafficLightPhase::red;
 
       // Send update to message queue
       _trafficLightQueue.send(std::move(_currentPhase));
